@@ -38,8 +38,7 @@ import org.jetbrains.kotlin.resolve.scopes.receivers.ExpressionReceiver
 import org.jetbrains.kotlin.resolve.scopes.receivers.ReceiverValue
 import org.jetbrains.kotlin.resolve.scopes.receivers.TransientReceiver
 import org.jetbrains.kotlin.resolve.scopes.utils.memberScopeAsImportingScope
-import org.jetbrains.kotlin.types.KotlinType
-import org.jetbrains.kotlin.types.TypeUtils
+import org.jetbrains.kotlin.types.*
 import org.jetbrains.kotlin.types.expressions.DoubleColonLHS
 import org.jetbrains.kotlin.types.expressions.ExpressionTypingUtils
 import org.jetbrains.kotlin.utils.Printer
@@ -165,7 +164,24 @@ fun createKCallableTypeForReference(
         is FunctionDescriptor -> {
             val returnType = descriptor.returnType ?: return null
             val valueParametersTypes = ExpressionTypingUtils.getValueParametersTypes(descriptor.valueParameters)
-            return reflectionTypes.getKFunctionType(Annotations.EMPTY, receiverType, valueParametersTypes, returnType)
+            val type = reflectionTypes.getKFunctionType(Annotations.EMPTY, receiverType, valueParametersTypes, returnType)
+
+/*
+            // TODO
+            val subst = object : TypeConstructorSubstitution() {
+                override fun get(key: TypeConstructor): TypeProjection? {
+                    val classifier = key.declarationDescriptor
+                    return when (classifier) {
+                        null -> null
+                        is TypeParameterDescriptor -> TypeUtils.makeStarProjection(classifier)
+                        else -> TypeProjectionImpl(classifier.defaultType)
+                    }
+                }
+            }
+            return TypeSubstitutor.create(subst).substitute(TypeProjectionImpl(type))?.type
+*/
+
+            return type
         }
         is PropertyDescriptor -> {
             val mutable = descriptor.isVar && run {

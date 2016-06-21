@@ -17,6 +17,8 @@
 package org.jetbrains.kotlin.resolve.calls
 
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
+import org.jetbrains.kotlin.builtins.getReturnTypeFromFunctionType
+import org.jetbrains.kotlin.builtins.isFunctionType
 import org.jetbrains.kotlin.config.LanguageFeatureSettings
 import org.jetbrains.kotlin.coroutines.controllerTypeIfCoroutine
 import org.jetbrains.kotlin.coroutines.resolveCoroutineHandleResultCallIfNeeded
@@ -169,6 +171,14 @@ class CallCompleter(
     ) {
         val returnType = candidateDescriptor.returnType
 
+        val expectedReturnType =
+                if (call.callElement.parent is KtCallableReferenceExpression /* TODO: check if RHS */) {
+                    // TODO: also add constraints for parameter types, if we're resolving a callable reference
+                    if (!TypeUtils.noExpectedType(expectedType) && expectedType.isFunctionType) getReturnTypeFromFunctionType(expectedType)
+                    else TypeUtils.NO_EXPECTED_TYPE
+                }
+                else expectedType
+
         fun ConstraintSystem.Builder.returnTypeInSystem(): KotlinType? =
                 returnType?.let {
                     val substitutor = typeVariableSubstitutors[call.toHandle()] ?: error("No substitutor for call: $call")
@@ -182,11 +192,11 @@ class CallCompleter(
             }
         }
 
-        if (returnType != null && !TypeUtils.noExpectedType(expectedType)) {
+        if (returnType != null && !TypeUtils.noExpectedType(expectedReturnType)) {
             updateSystemIfNeeded { builder ->
                 val returnTypeInSystem = builder.returnTypeInSystem()
                 if (returnTypeInSystem != null) {
-                    builder.addSubtypeConstraint(returnTypeInSystem, expectedType, EXPECTED_TYPE_POSITION.position())
+                    builder.addSubtypeConstraint(returnTypeInSystem, expectedReturnType, EXPECTED_TYPE_POSITION.position())
                     builder.build()
                 }
                 else null
@@ -206,7 +216,7 @@ class CallCompleter(
             }
         }
 
-        if (returnType != null && expectedType === TypeUtils.UNIT_EXPECTED_TYPE) {
+        if (returnType != null && expectedReturnType === TypeUtils.UNIT_EXPECTED_TYPE) {
             updateSystemIfNeeded { builder ->
                 val returnTypeInSystem = builder.returnTypeInSystem()
                 if (returnTypeInSystem != null) {
